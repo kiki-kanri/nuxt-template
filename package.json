@@ -8,10 +8,15 @@
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview"
   },
+  "dependencies": {
+    "@kikiutils/nuxt": "2.0.0-rc.14",
+    "nuxt": "^3.11.2",
+    "unocss": "^0.59.4",
+    "vue": "^3.4.25",
+    "vue-router": "^4.3.2"
+  },
   "devDependencies": {
-    "@kikiutils/nuxt": "2.0.0-alpha.6",
-    "nuxt": "^3.8.2",
-    "vue": "^3.3.10",
-    "vue-router": "^4.2.5"
+    "@kikiutils/types": "^1.0.1",
+    "vue-tsc": "1.8.27"
   }
 }
