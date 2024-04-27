@@ -8,10 +8,7 @@ export default defineNuxtConfig({
 		},
 		keepalive: true
 	},
-	devServer: {
-		host: process.env.DEV_SERVER_HOST,
-		port: Number(process.env.DEV_SERVER_PORT) || undefined
-	},
+	devServer: { host: process.env.DEV_SERVER_HOST, port: Number(process.env.DEV_SERVER_PORT) || undefined },
 	modules: ['@kikiutils/nuxt'],
 	purgecss: { enabled: true }
 });
