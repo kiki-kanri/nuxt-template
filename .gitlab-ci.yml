@@ -137,12 +137,12 @@ variables:
 # pnpm install setup.
 #
 # Install pnpm with the standalone installer and use a frozen lockfile.
-# `PNPM_VERSION=latest` intentionally follows the latest pnpm release line.
+# `PNPM_VERSION=latest-12` follows the latest pnpm 12 release line.
 .setup-pnpm-and-install-dependencies: &setup-pnpm-and-install-dependencies
   - *install-packages
   # - *setup-ssh-and-scan
   - export PATH="${PNPM_HOME:?must be set}/bin:$PATH"
-  - curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=latest sh -
+  - curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=latest-12 SHELL="$(command -v sh)" ENV="${HOME}/.shrc" sh -
   - pnpm config set store-dir "${PNPM_STORE_DIR:?must be set}"
   - pnpm install --frozen-lockfile
 
