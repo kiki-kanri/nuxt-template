@@ -1,0 +1,245 @@
+# Includes
+#
+# include:
+#   - local: .gitlab/ci/*.yml
+#   - project: group/project
+#     file: path/to/template.yml
+#     ref: main
+
+# Stages
+#
+# Keep `release` commented unless this repository has a semantic-release
+# configuration and the required GitLab release variables.
+
+stages:
+  - check
+  # - release
+
+# Defaults
+
+# Shared defaults apply to every non-hidden job unless the job overrides them.
+default:
+  interruptible: true
+
+  # retry:
+  #   max: 1
+  #   when:
+  #     - runner_system_failure
+  #     - stuck_or_timeout_failure
+  # timeout: 30m
+
+# Variables
+
+variables:
+  # Git checkout behavior.
+  # Check jobs use a shallow checkout; the release job overrides this to `0`
+  # so semantic-release can inspect the complete tag and commit history.
+  GIT_DEPTH: '20'
+  GIT_SUBMODULE_STRATEGY: none
+
+  # GitLab cache archive tuning.
+  # These settings reduce compression overhead for dependency caches.
+  CACHE_COMPRESSION_FORMAT: tarzstd
+  CACHE_COMPRESSION_LEVEL: fastest
+
+  # Project-local cache paths. GitLab cache paths must stay inside the checkout.
+  BUN_CACHE_DIR: .cache/bun/install/cache
+  NPM_CONFIG_CACHE: .cache/npm
+
+  # pnpm standalone installation writes its executable to PNPM_HOME. Keep that
+  # directory outside the cached store so binaries are recreated per job.
+  PNPM_HOME: $CI_PROJECT_DIR/.pnpm
+  PNPM_STORE_DIR: .cache/pnpm/store
+
+  # npm / semantic-release install hardening.
+  NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+  NPM_CONFIG_MIN_RELEASE_AGE: '1'
+
+# Rules
+
+# Release is intentionally restricted to the main branch. Do not add the
+# repository-specific dev release behavior to this shared template.
+.main-branch-rules: &main-branch-rules
+  - if: '$CI_COMMIT_BRANCH == "main"'
+    when: on_success
+  - when: never
+
+# Check jobs run only for merge requests targeting dev or main. The dev target
+# here is for normal checks; release remains main-only above.
+.check-rules: &check-rules
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(dev|main)$/'
+    when: always
+  - when: never
+
+# Caches
+
+# Keep the lockfile in each cache key so dependency changes invalidate only the
+# relevant package-manager cache.
+.bun-cache: &bun-cache
+  key:
+    files:
+      - bun.lock
+      - bun.lockb
+
+  paths:
+    - .cache/bun/install/cache
+
+  policy: pull-push
+
+.npm-cache: &npm-cache
+  key: npm-cache
+
+  paths:
+    - .cache/npm
+
+  policy: pull-push
+
+.pnpm-cache: &pnpm-cache
+  key:
+    files:
+      - pnpm-lock.yaml
+
+  paths:
+    - .cache/pnpm/store
+
+  policy: pull-push
+
+# Scripts
+
+# Install the tools required by both package-manager modes.
+.install-packages: &install-packages
+  - apk add --no-cache curl git
+
+# Optional SSH setup. Keep this block commented unless dependency installation
+# needs a private Git repository. `SSH_HOST` must be provided by a CI/CD variable.
+# To enable it, uncomment this block and the `- *setup-ssh-and-scan` line in the
+# active Bun or pnpm setup anchor below.
+# .setup-ssh-and-scan: &setup-ssh-and-scan
+#   - apk add --no-cache openssh-client
+#   - mkdir -p ~/.ssh
+#   - chmod 700 ~/.ssh
+#   - cp "${CI_SSH_PRIVATE_KEY_FOR_PACK}" ~/.ssh/id_ed25519
+#   - chmod 600 ~/.ssh/id_ed25519
+#   - ssh-keyscan -H "${SSH_HOST:?must be set}" >> ~/.ssh/known_hosts
+#   - chmod 644 ~/.ssh/known_hosts
+
+# Bun uses its documented frozen-lockfile install. The CLI cache-dir option
+# keeps the cache location explicit and avoids writing a repository bunfig.toml.
+.setup-bun-and-install-dependencies: &setup-bun-and-install-dependencies
+  - *install-packages
+  # - *setup-ssh-and-scan
+  - bun install --cache-dir "${BUN_CACHE_DIR}" --frozen-lockfile
+
+# pnpm is installed with the standalone binary installer instead of Corepack or
+# npm. `latest` is intentional: the organization tracks the latest pnpm line.
+.setup-pnpm-and-install-dependencies: &setup-pnpm-and-install-dependencies
+  - *install-packages
+  # - *setup-ssh-and-scan
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=latest sh -
+  - pnpm config set store-dir "${PNPM_STORE_DIR}"
+  - pnpm install --frozen-lockfile
+
+# Job templates
+
+.check-job:
+  stage: check
+
+  rules: *check-rules
+
+# Bun mode (default). Keep this block active when the repository uses bun.lock.
+# .bun-check-job:
+#   extends: .check-job
+#   image: oven/bun:alpine
+
+#   cache: *bun-cache
+
+#   before_script: *setup-bun-and-install-dependencies
+
+# pnpm mode. To switch modes, comment out `.bun-check-job` and the active Bun
+# jobs below, then uncomment `.pnpm-check-job` and the matching pnpm jobs.
+.pnpm-check-job:
+  extends: .check-job
+  image: node:26-alpine
+
+  cache: *pnpm-cache
+
+  before_script: *setup-pnpm-and-install-dependencies
+
+# Jobs: check (Bun mode)
+#
+# Keep exactly one package-manager version of each job active.
+
+# lint:
+#   extends: .bun-check-job
+
+#   script:
+#     - bun run lint
+
+# typecheck:
+#   extends: .bun-check-job
+
+#   script:
+#     - bun run typecheck
+
+# build:
+#   extends: .bun-check-job
+
+#   script:
+#     - bun run build
+
+# Jobs: check (pnpm mode)
+#
+# Uncomment this whole block after disabling the Bun-mode jobs above.
+#
+lint:
+  extends: .pnpm-check-job
+
+  script:
+    - pnpm run lint
+
+typecheck:
+  extends: .pnpm-check-job
+
+  script:
+    - pnpm run typecheck
+
+# build:
+#   extends: .pnpm-check-job
+
+#   script:
+#     - pnpm run build
+
+# Jobs: release
+#
+# Release is disabled by default because not every repository has a release
+# configuration. To enable it, uncomment both `- release` under `stages` and
+# this job. Its rules intentionally trigger on main only.
+#
+# The semantic-release plugin major ranges remain intentionally constrained:
+# update them as one tested set rather than independently floating them.
+# release:
+#   stage: release
+#   image: node:26-alpine
+#
+#   rules: *main-branch-rules
+#
+#   variables:
+#     GIT_DEPTH: '0'
+#
+#   cache: *npm-cache
+#
+#   before_script:
+#     - apk add --no-cache git
+#     - |
+#       npm install --global \
+#         --ignore-scripts=true \
+#         --min-release-age=1 \
+#         semantic-release@^25 \
+#         @semantic-release/changelog@^6 \
+#         @semantic-release/git@^10 \
+#         @semantic-release/gitlab@^13 \
+#         conventional-changelog-conventionalcommits@^9
+#
+#   script:
+#     - semantic-release
