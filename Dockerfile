@@ -1,12 +1,10 @@
 # syntax=docker/dockerfile:labs
 
 # Build stage
-FROM node:26-slim AS build-stage
+FROM ghcr.io/pnpm/pnpm:12 AS build-stage
 
-## Upgrade system packages and install pnpm
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    npm i -g pnpm@latest
+## Install Node.js for the build
+RUN pnpm runtime set node 26 -g
 
 ## Configure build-time options and the environment
 ARG PNPM_CONFIG_REGISTRY
@@ -17,8 +15,7 @@ WORKDIR /app
 
 ## Copy dependency manifests and install dependencies
 COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
-RUN --mount=id=pnpm-cache,target=/root/.cache/pnpm,type=cache \
-    --mount=id=pnpm-store,target=/root/.local/share/pnpm/store,type=cache \
+RUN --mount=id=pnpm-store,target=/pnpm/store,type=cache \
     pnpm i --frozen-lockfile --prod=false
 
 ## Configure options used by the application build
