@@ -110,18 +110,18 @@ variables:
 .install-packages: &install-packages
   - apk add --no-cache curl git
 
-# Optional SSH setup. Keep this block commented unless dependency installation
-# needs a private Git repository. `SSH_HOST` must be provided by a CI/CD variable.
-# To enable it, uncomment this block and the `- *setup-ssh-and-scan` line in the
-# active Bun or pnpm setup anchor below.
-# .setup-ssh-and-scan: &setup-ssh-and-scan
-#   - apk add --no-cache openssh-client
-#   - mkdir -p ~/.ssh
-#   - chmod 700 ~/.ssh
-#   - cp "${CI_SSH_PRIVATE_KEY_FOR_PACK}" ~/.ssh/id_ed25519
-#   - chmod 600 ~/.ssh/id_ed25519
-#   - ssh-keyscan -H "${SSH_HOST:?must be set}" >> ~/.ssh/known_hosts
-#   - chmod 644 ~/.ssh/known_hosts
+# Optional SSH setup. This anchor is defined for repositories that need private
+# Git dependencies; it runs only when the `- *setup-ssh-and-scan` line is enabled
+# in the active Bun or pnpm setup. `SSH_HOST` and `CI_SSH_PRIVATE_KEY_FOR_PACK`
+# must be provided as CI/CD variables.
+.setup-ssh-and-scan: &setup-ssh-and-scan
+  - apk add --no-cache openssh-client
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - cp "${CI_SSH_PRIVATE_KEY_FOR_PACK}" ~/.ssh/id_ed25519
+  - chmod 600 ~/.ssh/id_ed25519
+  - ssh-keyscan -H "${SSH_HOST:?must be set}" >> ~/.ssh/known_hosts
+  - chmod 644 ~/.ssh/known_hosts
 
 # Bun uses its documented frozen-lockfile install. The CLI cache-dir option
 # keeps the cache location explicit and avoids writing a repository bunfig.toml.
