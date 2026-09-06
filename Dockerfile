@@ -16,7 +16,7 @@ WORKDIR /app
 ## Copy dependency manifests and install dependencies
 COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
 RUN --mount=id=pnpm-store,target=/pnpm/store,type=cache \
-    pnpm i --frozen-lockfile --prod=false
+    pnpm i --frozen-lockfile
 
 ## Configure options used by the application build
 # ARG
